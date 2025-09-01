@@ -20,55 +20,53 @@ on:
       port_context:
         required: true
         description: includes blueprint, run ID, and entity identifier from Port.
-
 jobs:
   provision-ec2:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v3
         with:
           node-version: '14'
 
-      - name: Log starting EC2 creation
+      - name: Log starting of EC2 Instance creation 
         uses: port-labs/port-github-action@v1
         with:
           clientId: ${{ secrets.PORT_CLIENT_ID }}
           clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
           operation: PATCH_RUN
-          runId: ${{ fromJson(github.event.inputs.port_context).rund_id }}
+          runId: ${{ fromJson(inputs.port_context).run_id }}
           logMessage: |
-            About to create EC2 instance ${{ github.event.inputs.ec2_name }} .. ⛴️
+              About to create ec2 instance ${{ github.event.inputs.ec2_name }} .. ⛴️
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.TF_USER_AWS_KEY }}
-          aws-secret-access-key: ${{ secrets.TF_USER_AWS_SECRET }}
-          aws-region: ${{ secrets.TF_USER_AWS_REGION }}
+          aws-access-key-id: '${{ secrets.TF_USER_AWS_KEY }}'
+          aws-secret-access-key: '${{ secrets.TF_USER_AWS_SECRET }}'
+          aws-region: '${{ secrets.TF_USER_AWS_REGION }}'
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_wrapper: false
-
+          
       - name: Terraform Apply
+        id:   apply
         env:
-          TF_VAR_ec2_name: ${{ github.event.inputs.ec2_name }}
-          TF_VAR_pem_key_name: ${{ github.event.inputs.pem_key_name }}
-          TF_VAR_aws_region: ${{ secrets.TF_USER_AWS_REGION }}
-          TF_VAR_ec2_instance_type: ${{ github.event.inputs.ec2_instance_type }}
+          TF_VAR_ec2_name:  "${{ github.event.inputs.ec2_name }}"
+          TF_VAR_pem_key_name: "${{ github.event.inputs.pem_key_name}}"
+          TF_VAR_aws_region: "${{ secrets.TF_USER_AWS_REGION }}"
+          TF_VAR_ec2_instance_type: "${{ github.event.inputs.ec2_instance_type}}"
         run: |
           cd aws-ec2
           terraform init
           terraform validate
-          terraform plan
+          terraform plan 
           terraform apply -auto-approve
 
-      - name: Set Outputs from Terraform
+      - name: Set Outputs
+        id: set_outputs
         run: |
           cd aws-ec2
           echo "instance_id=$(terraform output -raw instance_id)" >> $GITHUB_ENV
@@ -87,33 +85,33 @@ jobs:
           tags=$(terraform output -json tags | jq -c .)
           echo "tags=$tags" >> $GITHUB_ENV
 
-      - name: Log EC2 creation success
+      - name: Create a log message
         uses: port-labs/port-github-action@v1
         with:
           clientId: ${{ secrets.PORT_CLIENT_ID }}
           clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
           operation: PATCH_RUN
-          runId: ${{ fromJson(github.event.inputs.port_context).rund_id }}
+          runId: ${{ fromJson(inputs.port_context).run_id }}
           logMessage: |
-            EC2 Instance created successfully ✅
+              EC2 Instance created successfully ✅
 
-      - name: Report created instance to Port
+     - name: Report Created Instance to Port
         uses: port-labs/port-github-action@v1
         with:
           clientId: ${{ secrets.PORT_CLIENT_ID }}
           clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
           baseUrl: https://api.getport.io
           operation: PATCH_RUN
-          runId: ${{ fromJson(github.event.inputs.port_context).rund_id }}
-          logMessage: "Upserting created EC2 Instance to Port ..."
-
+          runId: ${{ fromJson(inputs.port_context).run_id }}
+          logMessage: "Upserting created EC2 Instance to Port ... "
+          
       - name: UPSERT EC2 Instance Entity
         uses: port-labs/port-github-action@v1
         with:
-          identifier: "${{ env.instance_id }}"
-          title: "${{ github.event.inputs.ec2_name }}"
-          blueprint: ${{ fromJson(github.event.inputs.port_context).blueprint }}
-          properties: |
+          identifier: "${{ steps.display_outputs.outputs.instance_id }}"
+          title: "${{ inputs.ec2_name }}"
+          blueprint: ${{ fromJson(inputs.port_context).blueprint }}
+          properties: |-
             {
               "instance_state": "${{ env.instance_state }}",
               "instance_type": "${{ env.instance_type }}",
@@ -132,14 +130,14 @@ jobs:
           clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
           baseUrl: https://api.getport.io
           operation: UPSERT
-          runId: ${{ fromJson(github.event.inputs.port_context).rund_id }}
+          runId: ${{ fromJson(inputs.port_context).run_id }}
 
-      - name: Log after upserting entity
+      - name: Log After Upserting Entity
         uses: port-labs/port-github-action@v1
         with:
           clientId: ${{ secrets.PORT_CLIENT_ID }}
           clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
           baseUrl: https://api.getport.io
           operation: PATCH_RUN
-          runId: ${{ fromJson(github.event.inputs.port_context).rund_id }}
+          runId: ${{ fromJson(inputs.port_context).run_id }}
           logMessage: "Entity upserting was successful ✅"
