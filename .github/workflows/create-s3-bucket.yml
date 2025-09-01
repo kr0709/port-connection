@@ -2,6 +2,10 @@ name: Create S3 Bucket
 
 on:
   workflow_dispatch:
+    inputs:
+      port_context:
+        description: 'Port.io context input'
+        required: true
 
 jobs:
   create-bucket:
