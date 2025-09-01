@@ -1,0 +1,24 @@
+name: AWS Integration with Port
+
+on:
+  workflow_dispatch:   # manual trigger
+  schedule:
+    - cron: "0 */1 * * *"   # runs every hour
+
+jobs:
+  run-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30   # Set a time limit for the job
+
+    steps:
+      - name: Run AWS Integration with Port
+        uses: port-labs/ocean-sail@v1
+        with:
+          type: aws
+          port_client_id: ${{ secrets.PORT_CLIENT_ID }}
+          port_client_secret: ${{ secrets.PORT_CLIENT_SECRET }}
+          port_base_url: "https://api.port.io"
+          config: |
+            aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+            aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            aws-region: ${{ secrets.AWS_REGION }}
