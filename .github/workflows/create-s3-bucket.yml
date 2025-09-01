@@ -4,7 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       port_context:
-        description: 'Port.io context input'
+        description: "Port.io context info"
+        required: false
+      bucket_name:
+        description: "Name of the S3 bucket to create"
+        required: true
+      region:
+        description: "AWS region for the S3 bucket"
         required: true
 
 jobs:
@@ -20,14 +26,22 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ github.event.inputs.region }}
 
       - name: Create S3 bucket
         run: |
-          BUCKET_NAME="my-unique-bucket-${GITHUB_RUN_ID}"
-          REGION="${{ secrets.AWS_REGION }}"
+          BUCKET_NAME="${{ github.event.inputs.bucket_name }}"
+          REGION="${{ github.event.inputs.region }}"
+          echo "Port.io context: ${{ github.event.inputs.port_context }}"
           echo "Creating bucket: $BUCKET_NAME in region: $REGION"
-          aws s3api create-bucket \
-            --bucket $BUCKET_NAME \
-            --region $REGION \
-            --create-bucket-configuration LocationConstraint=$REGION
+
+          # Check if bucket already exists
+          if aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
+            echo "Bucket $BUCKET_NAME already exists, skipping creation."
+          else
+            aws s3api create-bucket \
+              --bucket "$BUCKET_NAME" \
+              --region "$REGION" \
+              --create-bucket-configuration LocationConstraint="$REGION"
+            echo "Bucket $BUCKET_NAME created successfully."
+          fi
