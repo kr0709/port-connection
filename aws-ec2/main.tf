@@ -19,7 +19,7 @@ provider "aws" {
 }
 
 resource "aws_instance" "app_server" {
-  ami           = data.aws_ami.ubuntu.id
+  ami           = "ami-00ca32bbc84273381"
   instance_type = var.ec2_instance_type
   key_name      = var.pem_key_name
 
